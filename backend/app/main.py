@@ -1,17 +1,21 @@
 import os
 import re
+import time
+import base64
 import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, desc
 from datetime import datetime, timezone
+import httpx
 
 from .config import settings
 from .database import get_db, init_db
-from .models import User, Favorite, Playlist, History
+from .models import User, Favorite, Playlist, History, SpotifyToken
 from .security import verify_telegram_data
 from .spotify_client import spotify_client
 from .stream_extractor import extract_stream_url
@@ -36,6 +40,10 @@ app.add_middleware(
 )
 
 
+# ──────────────────────────────────────────────
+# Health
+# ──────────────────────────────────────────────
+
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
@@ -43,11 +51,9 @@ async def health():
 
 @app.get("/api/spotify-debug")
 async def spotify_debug():
-    """Debug endpoint — check if Spotify credentials work."""
     try:
         await spotify_client._ensure_token()
-        # Try a simple search
-        data = await spotify_client._get("/search", {"q": "test", "type": "track", "limit": 1})
+        data = await spotify_client._search_single_type("test", "track", 1)
         return {
             "status": "ok",
             "token_ok": True,
@@ -57,6 +63,143 @@ async def spotify_debug():
     except Exception as e:
         return {"status": "error", "error": str(e), "type": type(e).__name__}
 
+
+# ──────────────────────────────────────────────
+# Spotify OAuth (Web Playback SDK)
+# ──────────────────────────────────────────────
+
+@app.get("/api/spotify/login")
+async def spotify_login(user: User = Depends(verify_telegram_data)):
+    """Return a Spotify OAuth URL. Frontend opens it via tg.openLink()."""
+    from urllib.parse import urlencode
+    params = urlencode({
+        "client_id": settings.SPOTIFY_CLIENT_ID,
+        "response_type": "code",
+        "redirect_uri": settings.SPOTIFY_REDIRECT_URI,
+        "scope": "streaming user-read-email user-read-private user-modify-playback-state user-read-playback-state",
+        "state": str(user.telegram_id),
+    })
+    return {"auth_url": f"https://accounts.spotify.com/authorize?{params}"}
+
+
+@app.get("/api/spotify/callback")
+async def spotify_callback(
+    code: str = Query(None),
+    state: str = Query(None),
+    error: str = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """Public endpoint: Spotify redirects here after user authorises."""
+    if error or not code or not state:
+        return HTMLResponse(
+            "<html><body style='background:#121212;color:white;font-family:sans-serif;"
+            "text-align:center;padding:50px'><h2>\u274c \u041e\u0448\u0438\u0431\u043a\u0430"
+            " \u0430\u0432\u0442\u043e\u0440\u0438\u0437\u0430\u0446\u0438\u0438.</h2>"
+            "<p>\u0412\u0435\u0440\u043d\u0438\u0441\u044c \u0432 Telegram.</p></body></html>"
+        )
+
+    try:
+        telegram_id = int(state)
+    except ValueError:
+        return HTMLResponse("<h2>Bad state</h2>")
+
+    creds = base64.b64encode(
+        f"{settings.SPOTIFY_CLIENT_ID}:{settings.SPOTIFY_CLIENT_SECRET}".encode()
+    ).decode()
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(
+            "https://accounts.spotify.com/api/token",
+            headers={"Authorization": f"Basic {creds}"},
+            data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": settings.SPOTIFY_REDIRECT_URI,
+            },
+        )
+
+    if resp.status_code != 200:
+        return HTMLResponse(
+            "<html><body style='background:#121212;color:white;font-family:sans-serif;"
+            "text-align:center;padding:50px'><h2>\u274c \u041e\u0448\u0438\u0431\u043a\u0430"
+            " \u043f\u043e\u043b\u0443\u0447\u0435\u043d\u0438\u044f \u0442\u043e\u043a\u0435\u043d\u0430.</h2></body></html>"
+        )
+
+    token_data = resp.json()
+    expires_at = time.time() + token_data["expires_in"]
+
+    existing = await db.execute(
+        select(SpotifyToken).where(SpotifyToken.telegram_id == telegram_id)
+    )
+    record = existing.scalar_one_or_none()
+    if record:
+        record.access_token = token_data["access_token"]
+        if "refresh_token" in token_data:
+            record.refresh_token = token_data["refresh_token"]
+        record.expires_at = expires_at
+    else:
+        db.add(SpotifyToken(
+            telegram_id=telegram_id,
+            access_token=token_data["access_token"],
+            refresh_token=token_data["refresh_token"],
+            expires_at=expires_at,
+        ))
+    await db.commit()
+
+    return HTMLResponse(
+        "<html><body style='background:#121212;color:white;font-family:sans-serif;"
+        "text-align:center;padding:60px 20px'>"
+        "<div style='font-size:60px'>\u2705</div>"
+        "<h2 style='color:#1DB954'>Spotify \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0451\u043d!</h2>"
+        "<p>\u0412\u0435\u0440\u043d\u0438\u0441\u044c \u0432 Telegram \u0438 \u043d\u0430\u0436\u043c\u0438"
+        " \u043a\u043d\u043e\u043f\u043a\u0443 \u0435\u0449\u0451 \u0440\u0430\u0437.</p>"
+        "<script>setTimeout(()=>window.close(),3000);</script>"
+        "</body></html>"
+    )
+
+
+@app.get("/api/spotify/token")
+async def get_spotify_token(
+    user: User = Depends(verify_telegram_data),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return the user's Spotify access token (auto-refresh if needed)."""
+    result = await db.execute(
+        select(SpotifyToken).where(SpotifyToken.telegram_id == user.telegram_id)
+    )
+    record = result.scalar_one_or_none()
+    if not record:
+        return {"connected": False}
+
+    # Refresh if expiring within 5 minutes
+    if time.time() > record.expires_at - 300:
+        creds = base64.b64encode(
+            f"{settings.SPOTIFY_CLIENT_ID}:{settings.SPOTIFY_CLIENT_SECRET}".encode()
+        ).decode()
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                "https://accounts.spotify.com/api/token",
+                headers={"Authorization": f"Basic {creds}"},
+                data={"grant_type": "refresh_token", "refresh_token": record.refresh_token},
+            )
+        if resp.status_code == 200:
+            data = resp.json()
+            record.access_token = data["access_token"]
+            record.expires_at = time.time() + data["expires_in"]
+            if "refresh_token" in data:
+                record.refresh_token = data["refresh_token"]
+            await db.commit()
+
+    return {
+        "connected": True,
+        "access_token": record.access_token,
+        "expires_at": record.expires_at,
+    }
+
+
+# ──────────────────────────────────────────────
+# User
+# ──────────────────────────────────────────────
 
 @app.get("/api/me")
 async def get_me(user: User = Depends(verify_telegram_data)):
@@ -72,7 +215,6 @@ async def get_me(user: User = Depends(verify_telegram_data)):
 
 @app.get("/api/home")
 async def get_home(user: User = Depends(verify_telegram_data)):
-    # Use return_exceptions=True so one failure doesn't crash both
     results = await asyncio.gather(
         spotify_client.get_new_releases(20),
         spotify_client.get_featured_playlists(10),
@@ -139,6 +281,10 @@ async def get_artist(artist_id: str, user: User = Depends(verify_telegram_data))
     return await spotify_client.get_artist_details(artist_id)
 
 
+# ──────────────────────────────────────────────
+# Favorites
+# ──────────────────────────────────────────────
+
 @app.get("/api/favorites")
 async def get_favorites(
     user: User = Depends(verify_telegram_data),
@@ -188,6 +334,10 @@ async def remove_favorite(
     return {"status": "removed"}
 
 
+# ──────────────────────────────────────────────
+# Playlists
+# ──────────────────────────────────────────────
+
 @app.get("/api/playlists")
 async def get_playlists(
     user: User = Depends(verify_telegram_data),
@@ -216,7 +366,7 @@ async def import_playlist(
     playlist_id = match.group(1)
     try:
         pl_data, tracks = await asyncio.gather(
-            spotify_client._get(f"/playlists/{playlist_id}"),
+            spotify_client._get_one(f"/playlists/{playlist_id}", {}),
             spotify_client.parse_playlist(playlist_id),
         )
     except Exception as exc:
@@ -248,6 +398,6 @@ async def get_playlist(
             "cover_url": playlist.cover_url, "tracks": playlist.tracks}
 
 
-# Serve frontend static files — must be mounted LAST, after all /api/* routes
+# Serve frontend — must be LAST
 if os.path.isdir("static"):
     app.mount("/", StaticFiles(directory="static", html=True), name="static")
