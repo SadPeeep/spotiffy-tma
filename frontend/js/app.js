@@ -1,5 +1,5 @@
 import { api } from './api.js';
-import { Player } from './player.js';
+import { Player, initSpotifySDK } from './player.js';
 import { shareTrackToStory } from './stories.js';
 import { saveTrackOffline, isTrackOffline } from './indexeddb.js';
 
@@ -9,6 +9,7 @@ tg?.setHeaderColor?.('#121212');
 tg?.setBackgroundColor?.('#121212');
 
 let player, favoritesSet = new Set(), searchTimer = null, currentFilter = 'track,artist,album';
+let spotifyConnected = false;
 
 async function init() {
   lucide.createIcons();
@@ -18,7 +19,77 @@ async function init() {
   setupProfile();
   setupPlayerControls();
   setupModals();
-  await Promise.all([loadHome(), loadUserProfile(), loadFavorites()]);
+  await Promise.all([
+    loadHome(),
+    loadUserProfile(),
+    loadFavorites(),
+    initSpotifyConnection(),
+  ]);
+}
+
+// ================================================================
+// SPOTIFY CONNECTION
+// ================================================================
+async function initSpotifyConnection() {
+  try {
+    const data = await api.getSpotifyToken();
+    if (data.connected && data.access_token) {
+      spotifyConnected = true;
+      showSpotifyBadge(true);
+      // Init Web Playback SDK with user token
+      try {
+        await initSpotifySDK(data.access_token);
+        showToast('\u2705 Spotify Premium \u0430\u043a\u0442\u0438\u0432\u0435\u043d');
+      } catch (e) {
+        console.error('SDK init failed:', e);
+      }
+    } else {
+      showSpotifyBadge(false);
+    }
+  } catch {
+    showSpotifyBadge(false);
+  }
+}
+
+function showSpotifyBadge(connected) {
+  const banner = document.getElementById('spotify-connect-banner');
+  const badge  = document.getElementById('spotify-connected-badge');
+  if (connected) {
+    banner?.classList.add('hidden');
+    badge?.classList.remove('hidden');
+  } else {
+    banner?.classList.remove('hidden');
+    badge?.classList.add('hidden');
+  }
+}
+
+async function connectSpotify() {
+  try {
+    showToast('\u041e\u0442\u043a\u0440\u044b\u0432\u0430\u0435\u043c Spotify...');
+    const data = await api.getSpotifyLoginUrl();
+    if (data.auth_url) {
+      tg?.openLink(data.auth_url);
+      showToast('\u0410\u0432\u0442\u043e\u0440\u0438\u0437\u0443\u0439\u0441\u044f \u0438 \u0432\u0435\u0440\u043d\u0438\u0441\u044c \u0432 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435', 5000);
+      // Poll for token every 3s for 60s
+      let attempts = 0;
+      const poll = setInterval(async () => {
+        attempts++;
+        if (attempts > 20) { clearInterval(poll); return; }
+        try {
+          const t = await api.getSpotifyToken();
+          if (t.connected && t.access_token) {
+            clearInterval(poll);
+            spotifyConnected = true;
+            showSpotifyBadge(true);
+            await initSpotifySDK(t.access_token);
+            showToast('\u2705 Spotify \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0451\u043d! \u041c\u043e\u0436\u043d\u043e \u0441\u043b\u0443\u0448\u0430\u0442\u044c.');
+          }
+        } catch {}
+      }, 3000);
+    }
+  } catch (e) {
+    showToast('\u041e\u0448\u0438\u0431\u043a\u0430: ' + e.message);
+  }
 }
 
 // ================================================================
@@ -350,6 +421,9 @@ function setupProfile() {
       ? '\u2713 \u041e\u0444\u0444\u043b\u0430\u0439\u043d-\u0440\u0435\u0436\u0438\u043c \u0432\u043a\u043b\u044e\u0447\u0451\u043d'
       : '\u041e\u0444\u0444\u043b\u0430\u0439\u043d-\u0440\u0435\u0436\u0438\u043c \u0432\u044b\u043a\u043b\u044e\u0447\u0435\u043d')
   );
+
+  // Spotify connect button
+  document.getElementById('btn-connect-spotify')?.addEventListener('click', connectSpotify);
 }
 
 async function loadPlaylists() {
