@@ -8,7 +8,7 @@ let _progressInterval = null;
 
 /**
  * Call once when you have a Spotify access token.
- * Resolves when the player is ready (device_id obtained).
+ * Resolves when the SDK player is ready (device_id obtained).
  */
 export function initSpotifySDK(token) {
   _accessToken = token;
@@ -21,7 +21,7 @@ export function initSpotifySDK(token) {
       });
       _sdkPlayer.addListener('ready', ({ device_id }) => {
         _deviceId = device_id;
-        console.log('Spotify SDK ready, device:', device_id);
+        console.log('Spotify SDK ready, device_id:', device_id);
         resolve(true);
       });
       _sdkPlayer.addListener('not_ready', () => { _deviceId = null; });
@@ -30,7 +30,7 @@ export function initSpotifySDK(token) {
       _sdkPlayer.addListener('authentication_error', ({ message }) =>
         console.error('SDK auth error:', message));
       _sdkPlayer.addListener('account_error', ({ message }) =>
-        console.error('SDK account error (need Premium?):', message));
+        console.error('SDK account error (Premium required):', message));
       _sdkPlayer.connect();
     };
     if (window.Spotify) {
@@ -45,20 +45,22 @@ export function updateSpotifyToken(token) {
   _accessToken = token;
 }
 
+export function isSDKReady() {
+  return !!(  _deviceId && _accessToken);
+}
+
 async function _playViaSDK(trackId, onPlayPause) {
   if (!_deviceId || !_accessToken) return false;
   try {
-    const resp = await fetch(
-      `https://api.spotify.com/v1/me/player/play?device_id=${_deviceId}`,
-      {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${_accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ uris: [`spotify:track:${trackId}`] }),
-      }
-    );
+    const url = 'https://api.spotify.com/v1/me/player/play?device_id=' + encodeURIComponent(_deviceId);
+    const resp = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        Authorization: 'Bearer ' + _accessToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ uris: ['spotify:track:' + trackId] }),
+    });
     if (resp.status === 204 || resp.ok) {
       onPlayPause(true);
       return true;
@@ -73,8 +75,7 @@ async function _playViaSDK(trackId, onPlayPause) {
 
 export class Player {
   constructor({ onTrackChange, onPlayPause, onProgress }) {
-    // Fallback audio element for preview_url
-    this.audio = new Audio();
+    this.audio = new Audio(); // fallback: Spotify preview_url
     this.queue = [];
     this.currentIndex = -1;
     this.currentTrack = null;
@@ -87,15 +88,14 @@ export class Player {
     this._usingSDK = false;
 
     this.audio.addEventListener('timeupdate', () => {
-      if (!this._usingSDK)
-        this._onProgress(this.audio.currentTime, this.audio.duration || 0);
-      if (window.syncLyricsGlobal && !this._usingSDK)
-        window.syncLyricsGlobal(this.audio.currentTime);
+      if (this._usingSDK) return;
+      this._onProgress(this.audio.currentTime, this.audio.duration || 0);
+      if (window.syncLyricsGlobal) window.syncLyricsGlobal(this.audio.currentTime);
     });
-    this.audio.addEventListener('ended', () => { if (!this._usingSDK) this._onEnd(); });
-    this.audio.addEventListener('play',  () => { if (!this._usingSDK) this._onPlayPause(true); });
-    this.audio.addEventListener('pause', () => { if (!this._usingSDK) this._onPlayPause(false); });
-    this.audio.addEventListener('error', () => {
+    this.audio.addEventListener('ended',  () => { if (!this._usingSDK) this._onEnd(); });
+    this.audio.addEventListener('play',   () => { if (!this._usingSDK) this._onPlayPause(true); });
+    this.audio.addEventListener('pause',  () => { if (!this._usingSDK) this._onPlayPause(false); });
+    this.audio.addEventListener('error',  () => {
       if (!this.isLoading) window.showToast?.('\u041e\u0448\u0438\u0431\u043a\u0430 \u0432\u043e\u0441\u043f\u0440\u043e\u0438\u0437\u0432\u0435\u0434\u0435\u043d\u0438\u044f');
     });
   }
@@ -123,7 +123,7 @@ export class Player {
         return;
       }
 
-      // 2. Spotify Web Playback SDK (full track, requires Premium)
+      // 2. Spotify Web Playback SDK — full track, Premium
       if (_deviceId && _accessToken && track.id) {
         const ok = await _playViaSDK(track.id, this._onPlayPause.bind(this));
         if (ok) {
@@ -133,11 +133,11 @@ export class Player {
         }
       }
 
-      // 3. Spotify preview_url fallback (30s)
+      // 3. Fallback: Spotify 30-sec preview
       if (track.preview_url) {
         this.audio.src = track.preview_url;
         await this.audio.play();
-        window.showToast?.('\u26a1 30\u0441 \u043f\u0440\u0435\u0432\u044c\u044e (Spotify \u043d\u0435 \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0451\u043d)');
+        window.showToast?.('\u26a1 30\u0441 \u043f\u0440\u0435\u0432\u044c\u044e (п\u043e\u0434\u043a\u043b\u044e\u0447\u0438\u0442\u0435 Spotify \u0434\u043b\u044f \u043f\u043e\u043b\u043d\u044b\u0445 \u0442\u0440\u0435\u043a\u043e\u0432)');
         return;
       }
 
@@ -160,6 +160,7 @@ export class Player {
       this._onProgress(pos, dur);
       if (window.syncLyricsGlobal) window.syncLyricsGlobal(pos);
       this._onPlayPause(!state.paused);
+      // Auto-advance when track ends
       if (!state.paused && dur > 0 && state.position >= state.duration - 500) {
         this._stopSDKProgress();
         this._onEnd();
