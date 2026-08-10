@@ -55,4 +55,6 @@ export const api = {
   // Spotify OAuth / Web Playback SDK
   getSpotifyLoginUrl: () => apiRequest('/api/spotify/login'),
   getSpotifyToken:    () => apiRequest('/api/spotify/token'),
+  // Серверный токен: твой Premium аккаунт для всех юзеров
+  getAppToken:        () => apiRequest('/api/spotify/app-token'),
 };
