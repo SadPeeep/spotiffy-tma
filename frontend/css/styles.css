@@ -19,6 +19,137 @@ body {
 .scrollbar-none::-webkit-scrollbar { display: none; }
 .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* ===== MY WAVE BLOB SECTION ===== */
+.my-wave-section {
+  position: relative;
+  height: 220px;
+  background: #080808;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.wave-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(55px);
+  opacity: 0.75;
+  will-change: transform;
+}
+
+.wave-blob-yellow {
+  width: 260px;
+  height: 260px;
+  background: radial-gradient(circle at 40% 40%, #fbbf24, #f59e0b 60%, transparent);
+  top: -80px;
+  left: 15%;
+  animation: blob1 9s ease-in-out infinite;
+}
+
+.wave-blob-purple {
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(circle at 40% 40%, #a855f7, #7c3aed 60%, transparent);
+  top: 30px;
+  right: 5%;
+  animation: blob2 11s ease-in-out infinite;
+}
+
+.wave-blob-teal {
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle at 40% 40%, #2dd4bf, #0891b2 60%, transparent);
+  bottom: -60px;
+  left: -20px;
+  animation: blob3 10s ease-in-out infinite;
+}
+
+.wave-blob-orange {
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle at 40% 40%, #fb923c, #dc2626 60%, transparent);
+  bottom: 0px;
+  right: 25%;
+  animation: blob4 12s ease-in-out infinite;
+}
+
+@keyframes blob1 {
+  0%, 100% { transform: translate(0px,   0px)  scale(1);    }
+  25%       { transform: translate(40px,  25px) scale(1.08); }
+  50%       { transform: translate(15px,  50px) scale(0.95); }
+  75%       { transform: translate(-25px, 15px) scale(1.05); }
+}
+@keyframes blob2 {
+  0%, 100% { transform: translate(0px,   0px)   scale(1);    }
+  25%       { transform: translate(-35px, 20px)  scale(0.95); }
+  50%       { transform: translate(-10px, -30px) scale(1.1);  }
+  75%       { transform: translate(20px,  -10px) scale(0.98); }
+}
+@keyframes blob3 {
+  0%, 100% { transform: translate(0px,  0px)   scale(1);    }
+  25%       { transform: translate(30px, -20px) scale(1.07); }
+  50%       { transform: translate(50px, 10px)  scale(0.93); }
+  75%       { transform: translate(15px, 30px)  scale(1.04); }
+}
+@keyframes blob4 {
+  0%, 100% { transform: translate(0px,   0px)  scale(1);    }
+  25%       { transform: translate(-20px, -25px) scale(1.06); }
+  50%       { transform: translate(25px,  -10px) scale(0.96); }
+  75%       { transform: translate(10px,  20px)  scale(1.03); }
+}
+
+.wave-overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at center, transparent 20%, rgba(8,8,8,0.35) 100%),
+    linear-gradient(to bottom, rgba(8,8,8,0.1) 0%, rgba(8,8,8,0.5) 100%);
+  z-index: 5;
+}
+
+.wave-content {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.wave-play-btn {
+  width: 56px;
+  height: 56px;
+  background: rgba(255,255,255,0.18);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  transition: transform .2s, background .2s;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+.my-wave-section:active .wave-play-btn {
+  transform: scale(0.93);
+  background: rgba(255,255,255,0.28);
+}
+
+.wave-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 16px rgba(0,0,0,0.6);
+  letter-spacing: -0.5px;
+}
+
+.wave-sub {
+  font-size: 13px;
+  color: rgba(255,255,255,0.55);
+}
+/* ================================ */
+
 .track-card {
   display: flex;
   align-items: center;
@@ -31,10 +162,12 @@ body {
 .track-card:hover, .track-card:active { background: rgba(255,255,255,.06); }
 
 .album-card { cursor: pointer; flex-shrink: 0; width: 150px; }
-.album-card img { width: 150px; height: 150px; object-fit: cover; border-radius: 12px; }
+.album-card img { width: 150px; height: 150px; object-fit: cover; border-radius: 12px; transition: transform .15s; }
+.album-card:hover img { transform: scale(1.04); }
 
 .grid-card { cursor: pointer; }
-.grid-card:hover img { transform: scale(1.03); transition: transform .15s; }
+.grid-card img { transition: transform .15s; }
+.grid-card:hover img { transform: scale(1.03); }
 
 .genre-chip {
   padding: 28px 16px;
@@ -51,7 +184,7 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  padding: 8px 20px;
+  padding: 8px 0;
   color: var(--sp-muted);
   font-size: 10px;
   cursor: pointer;
