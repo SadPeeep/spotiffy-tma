@@ -31,12 +31,31 @@ async function init() {
 // SPOTIFY CONNECTION
 // ================================================================
 async function initSpotifyConnection() {
+  // 1. Сначала пробуем серверный токен (твой Premium аккаунт работает для всех)
+  try {
+    const appData = await api.getAppToken();
+    if (appData.access_token) {
+      showSpotifyBadge(true);
+      try {
+        const sdkOk = await initSpotifySDK(appData.access_token);
+        if (sdkOk) {
+          console.log('\u2705 Using server Spotify token — Premium for all users');
+          return; // всё ок, юзерский токен не нужен
+        }
+      } catch (e) {
+        console.error('SDK init with server token failed:', e);
+      }
+    }
+  } catch {
+    // серверный токен не настроен или ошибка — fallback на юзерский
+  }
+
+  // 2. Fallback: собственный токен юзера (если подключил свой Spotify)
   try {
     const data = await api.getSpotifyToken();
     if (data.connected && data.access_token) {
       spotifyConnected = true;
       showSpotifyBadge(true);
-      // Init Web Playback SDK with user token
       try {
         await initSpotifySDK(data.access_token);
         showToast('\u2705 Spotify Premium \u0430\u043a\u0442\u0438\u0432\u0435\u043d');
@@ -70,7 +89,6 @@ async function connectSpotify() {
     if (data.auth_url) {
       tg?.openLink(data.auth_url);
       showToast('\u0410\u0432\u0442\u043e\u0440\u0438\u0437\u0443\u0439\u0441\u044f \u0438 \u0432\u0435\u0440\u043d\u0438\u0441\u044c \u0432 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435', 5000);
-      // Poll for token every 3s for 60s
       let attempts = 0;
       const poll = setInterval(async () => {
         attempts++;
@@ -421,8 +439,6 @@ function setupProfile() {
       ? '\u2713 \u041e\u0444\u0444\u043b\u0430\u0439\u043d-\u0440\u0435\u0436\u0438\u043c \u0432\u043a\u043b\u044e\u0447\u0451\u043d'
       : '\u041e\u0444\u0444\u043b\u0430\u0439\u043d-\u0440\u0435\u0436\u0438\u043c \u0432\u044b\u043a\u043b\u044e\u0447\u0435\u043d')
   );
-
-  // Spotify connect button
   document.getElementById('btn-connect-spotify')?.addEventListener('click', connectSpotify);
 }
 
