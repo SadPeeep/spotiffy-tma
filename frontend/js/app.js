@@ -104,6 +104,7 @@ window.openAlbumSearch = async (artist) => {
 window.openSpotifyPlaylist = async (playlistId) => {
   try {
     showToast('\u0417\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u043c...');
+    // FIX: was `https://...` — invalid URL with extra braces
     const url = `https://open.spotify.com/playlist/${playlistId}`;
     const data = await api.importPlaylist(url);
     if (data.tracks?.length) { player.loadQueue(data.tracks); player.playTrack(0); }
@@ -220,14 +221,12 @@ async function loadUserProfile() {
     const tgUser = tg?.initDataUnsafe?.user;
     if (!tgUser) return;
 
-    // Profile tab info
     document.getElementById('profile-name').textContent =
       tgUser.first_name || tgUser.username || '';
     document.getElementById('profile-username').textContent =
       tgUser.username ? `@${tgUser.username}` : '';
 
     if (tgUser.photo_url) {
-      // Profile page avatar
       const profileAvatar = document.getElementById('profile-avatar');
       if (profileAvatar) {
         profileAvatar.src = tgUser.photo_url;
@@ -235,7 +234,6 @@ async function loadUserProfile() {
       }
       document.getElementById('profile-avatar-placeholder')?.classList.add('hidden');
 
-      // Nav bar: replace user icon with avatar image
       const navAvatar = document.getElementById('nav-avatar');
       const navIcon   = document.getElementById('nav-profile-icon');
       if (navAvatar) { navAvatar.src = tgUser.photo_url; navAvatar.classList.remove('hidden'); }
