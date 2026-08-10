@@ -27,8 +27,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Spotiffy TMA API", version="1.0.0", lifespan=lifespan)
 
-# Explicit CORS config — Telegram WebView requires explicit header names in preflight.
-# allow_headers=["*"] is unreliable in some Starlette versions for custom headers.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -41,6 +39,23 @@ app.add_middleware(
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/api/spotify-debug")
+async def spotify_debug():
+    """Debug endpoint — check if Spotify credentials work."""
+    try:
+        await spotify_client._ensure_token()
+        # Try a simple search
+        data = await spotify_client._get("/search", {"q": "test", "type": "track", "limit": 1})
+        return {
+            "status": "ok",
+            "token_ok": True,
+            "search_ok": bool(data.get("tracks")),
+            "client_id_prefix": settings.SPOTIFY_CLIENT_ID[:6] + "...",
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e), "type": type(e).__name__}
 
 
 @app.get("/api/me")
@@ -57,10 +72,14 @@ async def get_me(user: User = Depends(verify_telegram_data)):
 
 @app.get("/api/home")
 async def get_home(user: User = Depends(verify_telegram_data)):
-    new_releases, featured = await asyncio.gather(
+    # Use return_exceptions=True so one failure doesn't crash both
+    results = await asyncio.gather(
         spotify_client.get_new_releases(20),
         spotify_client.get_featured_playlists(10),
+        return_exceptions=True,
     )
+    new_releases = results[0] if isinstance(results[0], list) else []
+    featured = results[1] if isinstance(results[1], list) else []
     return {"new_releases": new_releases, "featured_playlists": featured}
 
 
@@ -70,7 +89,10 @@ async def search(
     type: str = Query("track,artist,album"),
     user: User = Depends(verify_telegram_data),
 ):
-    return await spotify_client.search(q, type)
+    try:
+        return await spotify_client.search(q, type)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Spotify error: {str(e)}")
 
 
 @app.get("/api/stream")
@@ -105,7 +127,11 @@ async def my_wave(
     user: User = Depends(verify_telegram_data),
     db: AsyncSession = Depends(get_db),
 ):
-    return {"tracks": await generate_wave(user, db)}
+    try:
+        tracks = await generate_wave(user, db)
+        return {"tracks": tracks}
+    except Exception:
+        return {"tracks": []}
 
 
 @app.get("/api/artist/{artist_id}")
