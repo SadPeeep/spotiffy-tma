@@ -27,15 +27,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Spotiffy TMA API", version="1.0.0", lifespan=lifespan)
 
-# IMPORTANT: allow_credentials=True cannot be combined with allow_origins=["*"] —
-# Starlette raises ValueError and the app crashes on startup.
-# Auth is done via X-Telegram-Init-Data header, not cookies, so credentials=False is correct.
+# Explicit CORS config — Telegram WebView requires explicit header names in preflight.
+# allow_headers=["*"] is unreliable in some Starlette versions for custom headers.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "X-Telegram-Init-Data", "Authorization"],
 )
 
 
