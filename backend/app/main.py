@@ -40,6 +40,9 @@ app.add_middleware(
     allow_headers=["Content-Type", "X-Telegram-Init-Data", "Authorization"],
 )
 
+# Кэш серверного токена в памяти (общий для всех юзеров)
+_server_token_cache: dict = {"access_token": None, "expires_at": 0.0}
+
 
 # -----------------------------------------------
 # Health
@@ -194,6 +197,52 @@ async def get_spotify_token(
         "access_token": record.access_token,
         "expires_at": record.expires_at,
     }
+
+
+@app.get("/api/spotify/app-token")
+async def get_app_token(user: User = Depends(verify_telegram_data)):
+    """
+    Возвращает серверный Spotify access token (твой Premium аккаунт).
+    Все юзеры используют этот токен для Web Playback SDK — не нужен свой Premium.
+    Токен кэшируется в памяти и обновляется автоматически.
+    """
+    if not settings.SPOTIFY_SERVER_REFRESH_TOKEN:
+        raise HTTPException(
+            status_code=503,
+            detail="Server Spotify token not configured. Set SPOTIFY_SERVER_REFRESH_TOKEN in env."
+        )
+
+    # Возвращаем кэшированный токен если ещё не истёк (с запасом 5 минут)
+    if _server_token_cache["access_token"] and time.time() < _server_token_cache["expires_at"] - 300:
+        return {"access_token": _server_token_cache["access_token"]}
+
+    # Обновляем токен через refresh_token
+    creds = base64.b64encode(
+        f"{settings.SPOTIFY_CLIENT_ID}:{settings.SPOTIFY_CLIENT_SECRET}".encode()
+    ).decode()
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(
+            "https://accounts.spotify.com/api/token",
+            headers={"Authorization": f"Basic {creds}"},
+            data={
+                "grant_type": "refresh_token",
+                "refresh_token": settings.SPOTIFY_SERVER_REFRESH_TOKEN,
+            },
+        )
+
+    if resp.status_code != 200:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Spotify token refresh failed: {resp.status_code}"
+        )
+
+    data = resp.json()
+    _server_token_cache["access_token"] = data["access_token"]
+    _server_token_cache["expires_at"] = time.time() + data["expires_in"]
+    if "refresh_token" in data:
+        print(f"[INFO] New server refresh_token received — update SPOTIFY_SERVER_REFRESH_TOKEN in env")
+
+    return {"access_token": data["access_token"]}
 
 
 # -----------------------------------------------
