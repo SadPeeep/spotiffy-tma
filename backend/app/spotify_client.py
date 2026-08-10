@@ -6,6 +6,8 @@ from urllib.parse import urlencode
 import httpx
 from .config import settings
 
+MARKET = "US"
+
 
 class SpotifyClient:
     BASE_URL = "https://api.spotify.com/v1"
@@ -34,12 +36,11 @@ class SpotifyClient:
 
     async def _search_one_type(self, q: str, type_: str, limit: int) -> dict:
         """
-        Search Spotify for a SINGLE type (track, artist, or album).
-        Sends one type per request so commas never appear in the URL.
+        Search Spotify for a SINGLE type (track, artist, album, or playlist).
+        One request per type so commas never appear in the URL.
         """
         await self._ensure_token()
-        # urlencode only encodes q and limit; type_ is a plain word with no special chars
-        params = urlencode({"q": q, "type": type_, "limit": limit})
+        params = urlencode({"q": q, "type": type_, "limit": limit, "market": MARKET})
         url = f"{self.BASE_URL}/search?{params}"
         response = await self._client.get(
             url,
@@ -47,6 +48,9 @@ class SpotifyClient:
         )
         response.raise_for_status()
         return response.json()
+
+    # alias kept for backward compat with debug endpoint
+    _search_single_type = _search_one_type
 
     async def _get(self, endpoint: str, params: dict = None) -> dict:
         await self._ensure_token()
@@ -57,6 +61,9 @@ class SpotifyClient:
         )
         response.raise_for_status()
         return response.json()
+
+    # alias
+    _get_one = _get
 
     def _format_track(self, track: dict) -> dict:
         return {
@@ -79,20 +86,17 @@ class SpotifyClient:
         self, query: str, search_type: str = "track,artist,album", limit: int = 20
     ) -> dict:
         """
-        Search Spotify. search_type may be a comma-separated list like
-        'track,artist,album'. We fire one request per type in parallel so
-        commas never appear in any URL (fixes Spotify 400 from %2C encoding).
+        Search Spotify. search_type may be a comma-separated list.
+        Fires one request per type in parallel (avoids %2C encoding bug).
         """
         types = [t.strip() for t in search_type.split(",") if t.strip()]
-
-        # Fire one request per type in parallel
         tasks = [self._search_one_type(query, t, limit) for t in types]
         raw_results = await asyncio.gather(*tasks, return_exceptions=True)
 
         result: dict = {}
         for t, raw in zip(types, raw_results):
             if isinstance(raw, Exception):
-                continue  # skip failed types silently
+                continue
             if t == "track" and "tracks" in raw:
                 result["tracks"] = [
                     self._format_track(item)
@@ -128,10 +132,10 @@ class SpotifyClient:
     async def get_artist_details(self, artist_id: str) -> dict:
         artist_data, top_tracks_data, albums_data = await asyncio.gather(
             self._get(f"/artists/{artist_id}"),
-            self._get(f"/artists/{artist_id}/top-tracks", {"market": "US"}),
+            self._get(f"/artists/{artist_id}/top-tracks", {"market": MARKET}),
             self._get(
                 f"/artists/{artist_id}/albums",
-                {"limit": 10, "include_groups": "album,single"},
+                {"limit": 10, "include_groups": "album,single", "market": MARKET},
             ),
         )
         return {
@@ -200,7 +204,7 @@ class SpotifyClient:
         while True:
             data = await self._get(
                 f"/playlists/{playlist_id}/tracks",
-                {"limit": 100, "offset": offset},
+                {"limit": 100, "offset": offset, "market": MARKET},
             )
             for item in data.get("items", []):
                 track = item.get("track")
@@ -238,7 +242,7 @@ class SpotifyClient:
         return all_albums[:limit]
 
     async def get_featured_playlists(self, limit: int = 10) -> list:
-        queries = ["top hits 2025", "best playlist 2025"]
+        queries = ["top hits 2025", "best playlist 2025", "popular music"]
         all_playlists: list = []
         seen_ids: set = set()
 
