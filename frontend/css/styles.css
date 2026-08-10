@@ -179,6 +179,7 @@ body {
 }
 .genre-chip:hover { opacity: .85; }
 
+/* ===== BOTTOM NAV ===== */
 .nav-btn {
   display: flex;
   flex-direction: column;
@@ -195,6 +196,29 @@ body {
 }
 .nav-btn.active { color: #fff; }
 .nav-btn.active svg { color: var(--sp-accent); }
+
+/* Nav avatar container — keeps avatar same visual size as lucide icons */
+.nav-avatar-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+#nav-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid rgba(255,255,255,0.35);
+  display: block;
+}
+
+.nav-btn.active #nav-avatar {
+  border-color: var(--sp-accent);
+}
+/* ======================== */
 
 .filter-btn {
   padding: 6px 16px;
