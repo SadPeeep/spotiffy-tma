@@ -218,20 +218,28 @@ async function doSearch(q) {
 async function loadUserProfile() {
   try {
     const tgUser = tg?.initDataUnsafe?.user;
-    if (tgUser) {
-      document.getElementById('home-username').textContent =
-        tgUser.first_name || tgUser.username || '\u0421\u043b\u0443\u0448\u0430\u0442\u0435\u043b\u044c';
-      document.getElementById('profile-name').textContent =
-        tgUser.first_name || tgUser.username || '';
-      document.getElementById('profile-username').textContent =
-        tgUser.username ? `@${tgUser.username}` : '';
-      if (tgUser.photo_url) {
-        ['home-avatar', 'profile-avatar'].forEach(id => {
-          const el = document.getElementById(id);
-          if (el) { el.src = tgUser.photo_url; el.classList.remove('hidden'); }
-        });
-        document.getElementById('profile-avatar-placeholder')?.classList.add('hidden');
+    if (!tgUser) return;
+
+    // Profile tab info
+    document.getElementById('profile-name').textContent =
+      tgUser.first_name || tgUser.username || '';
+    document.getElementById('profile-username').textContent =
+      tgUser.username ? `@${tgUser.username}` : '';
+
+    if (tgUser.photo_url) {
+      // Profile page avatar
+      const profileAvatar = document.getElementById('profile-avatar');
+      if (profileAvatar) {
+        profileAvatar.src = tgUser.photo_url;
+        profileAvatar.classList.remove('hidden');
       }
+      document.getElementById('profile-avatar-placeholder')?.classList.add('hidden');
+
+      // Nav bar: replace user icon with avatar image
+      const navAvatar = document.getElementById('nav-avatar');
+      const navIcon   = document.getElementById('nav-profile-icon');
+      if (navAvatar) { navAvatar.src = tgUser.photo_url; navAvatar.classList.remove('hidden'); }
+      if (navIcon)   { navIcon.classList.add('hidden'); }
     }
   } catch {}
 }
@@ -316,7 +324,6 @@ window.toggleFav = async (track) => {
       favoritesSet.add(track.id);
       showToast('\u2764\uFE0F \u0414\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u043e \u0432 \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435');
     }
-    // Update heart icons in place
     document.querySelectorAll(`.like-btn[data-tid="${track.id}"]`).forEach(btn => {
       const isLiked = favoritesSet.has(track.id);
       btn.classList.toggle('text-sp-accent', isLiked);
@@ -460,7 +467,6 @@ function setupPlayerControls() {
   const seekBar = document.getElementById('seek-bar');
   seekBar.addEventListener('input', () => player.seek(seekBar.value));
 
-  // FIX: .flip-container is a class, not an id — use querySelector
   document.getElementById('player-lyrics-btn').addEventListener('click', () =>
     document.querySelector('.flip-container')?.classList.toggle('flipped')
   );
