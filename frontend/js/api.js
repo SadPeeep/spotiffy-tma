@@ -18,8 +18,9 @@ async function apiRequest(endpoint, options = {}) {
 }
 
 export const api = {
+  // NOTE: type must NOT be encodeURIComponent'd — Spotify rejects encoded commas (%2C)
   search: (q, type = 'track,artist,album') =>
-    apiRequest(`/api/search?q=${encodeURIComponent(q)}&type=${encodeURIComponent(type)}`),
+    apiRequest(`/api/search?q=${encodeURIComponent(q)}&type=${type}`),
 
   stream: (trackId, artist, title) =>
     apiRequest(
