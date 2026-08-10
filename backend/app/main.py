@@ -1,8 +1,10 @@
+import os
 import re
 import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, desc
 from datetime import datetime, timezone
@@ -219,3 +221,8 @@ async def get_playlist(
         raise HTTPException(status_code=404, detail="Playlist not found")
     return {"id": playlist.id, "title": playlist.title,
             "cover_url": playlist.cover_url, "tracks": playlist.tracks}
+
+
+# Serve frontend static files — must be mounted LAST, after all /api/* routes
+if os.path.isdir("static"):
+    app.mount("/", StaticFiles(directory="static", html=True), name="static")
