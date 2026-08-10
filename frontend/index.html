@@ -7,6 +7,8 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Spotify Web Playback SDK -->
+  <script src="https://sdk.scdn.co/spotify-player.js"></script>
   <link rel="stylesheet" href="css/styles.css" />
   <script>
     tailwind.config = {
@@ -31,8 +33,6 @@
 
   <!-- ===== HOME ===== -->
   <div id="tab-home" class="tab-content space-y-6">
-
-    <!-- MY WAVE — animated blob -->
     <div id="btn-my-wave" class="my-wave-section cursor-pointer">
       <div class="wave-blob wave-blob-yellow"></div>
       <div class="wave-blob wave-blob-purple"></div>
@@ -41,22 +41,16 @@
       <div class="wave-overlay"></div>
       <div class="wave-content">
         <div class="wave-play-btn">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-7 h-7">
-            <path d="M8 5v14l11-7z"/>
-          </svg>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-7 h-7"><path d="M8 5v14l11-7z"/></svg>
         </div>
         <p class="wave-title">&#1052;&#1086;&#1103; &#1042;&#1086;&#1083;&#1085;&#1072;</p>
         <p class="wave-sub">&#1055;&#1077;&#1088;&#1089;&#1086;&#1085;&#1072;&#1083;&#1100;&#1085;&#1099;&#1077; &#1088;&#1077;&#1082;&#1086;&#1084;&#1077;&#1085;&#1076;&#1072;&#1094;&#1080;&#1080;</p>
       </div>
     </div>
-
-    <!-- New Releases -->
     <section class="px-4">
       <h2 class="font-bold text-lg mb-3">&#1053;&#1086;&#1074;&#1080;&#1085;&#1082;&#1080;</h2>
       <div id="new-releases" class="flex gap-4 overflow-x-auto pb-2 scrollbar-none"></div>
     </section>
-
-    <!-- Featured -->
     <section class="px-4 pb-6">
       <h2 class="font-bold text-lg mb-3">&#1056;&#1077;&#1082;&#1086;&#1084;&#1077;&#1085;&#1076;&#1091;&#1077;&#1084;&#1099;&#1077;</h2>
       <div id="featured-playlists" class="grid grid-cols-2 gap-3"></div>
@@ -82,6 +76,7 @@
 
   <!-- ===== PROFILE ===== -->
   <div id="tab-profile" class="tab-content hidden p-4 space-y-5">
+    <!-- User card -->
     <div class="flex items-center gap-4 bg-sp-surface rounded-2xl p-4 mt-2">
       <div class="relative">
         <img id="profile-avatar" src="" class="w-16 h-16 rounded-full object-cover hidden" />
@@ -95,6 +90,26 @@
       </div>
     </div>
 
+    <!-- Spotify Connect (shown when NOT connected) -->
+    <div id="spotify-connect-banner" class="hidden">
+      <button id="btn-connect-spotify"
+        class="w-full flex items-center justify-center gap-3 bg-sp-accent text-black font-bold rounded-2xl py-4 text-base active:opacity-80">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+        </svg>
+        &#1055;&#1086;&#1076;&#1082;&#1083;&#1102;&#1095;&#1080;&#1090;&#1100; Spotify &#1072;&#1082;&#1082;&#1072;&#1091;&#1085;&#1090;
+      </button>
+      <p class="text-xs text-sp-muted text-center mt-2">&#1044;&#1083;&#1103; &#1074;&#1086;&#1089;&#1087;&#1088;&#1086;&#1080;&#1079;&#1074;&#1077;&#1076;&#1077;&#1085;&#1080;&#1103; &#1087;&#1086;&#1083;&#1085;&#1099;&#1093; &#1090;&#1088;&#1077;&#1082;&#1086;&#1074; (&#1090;&#1088;&#1077;&#1073;&#1091;&#1077;&#1090;&#1089;&#1103; Spotify Premium)</p>
+    </div>
+
+    <!-- Spotify Connected badge (shown when connected) -->
+    <div id="spotify-connected-badge" class="hidden items-center gap-3 bg-sp-surface rounded-xl px-4 py-3">
+      <div class="w-2.5 h-2.5 rounded-full bg-sp-accent flex-shrink-0"></div>
+      <span class="text-sm font-medium">Spotify Premium &#1072;&#1082;&#1090;&#1080;&#1074;&#1077;&#1085;</span>
+      <span class="ml-auto text-xs text-sp-muted">&#1087;&#1086;&#1083;&#1085;&#1099;&#1077; &#1090;&#1088;&#1077;&#1082;&#1080; &#10003;</span>
+    </div>
+
+    <!-- Offline toggle -->
     <div class="flex items-center justify-between bg-sp-surface rounded-xl px-4 py-3">
       <div class="flex items-center gap-3">
         <i data-lucide="wifi-off" class="w-5 h-5 text-sp-muted"></i>
@@ -111,11 +126,9 @@
       <button class="profile-tab active" data-ptab="favorites">&#1048;&#1079;&#1073;&#1088;&#1072;&#1085;&#1085;&#1086;&#1077;</button>
       <button class="profile-tab" data-ptab="playlists">&#1055;&#1083;&#1077;&#1081;&#1083;&#1080;&#1089;&#1090;&#1099;</button>
     </div>
-
     <div id="profile-favorites" class="profile-tab-content space-y-1">
       <p class="text-sp-muted text-sm text-center py-8">&#1047;&#1072;&#1075;&#1088;&#1091;&#1079;&#1082;&#1072;...</p>
     </div>
-
     <div id="profile-playlists" class="profile-tab-content hidden">
       <button id="btn-import-playlist" class="w-full flex items-center justify-center gap-2 border border-sp-accent text-sp-accent rounded-xl py-3 text-sm font-medium mb-4">
         <i data-lucide="plus-circle" class="w-4 h-4"></i> &#1048;&#1084;&#1087;&#1086;&#1088;&#1090;&#1080;&#1088;&#1086;&#1074;&#1072;&#1090;&#1100; &#1087;&#1083;&#1077;&#1081;&#1083;&#1080;&#1089;&#1090; Spotify
@@ -146,14 +159,8 @@
 
 <!-- ===== BOTTOM NAV ===== -->
 <nav class="fixed bottom-0 left-0 right-0 bg-sp-surface border-t border-white/10 flex z-50">
-  <button class="nav-btn active" data-tab="home">
-    <i data-lucide="home" class="w-5 h-5"></i>
-    <span>&#1043;&#1083;&#1072;&#1074;&#1085;&#1072;&#1103;</span>
-  </button>
-  <button class="nav-btn" data-tab="search">
-    <i data-lucide="search" class="w-5 h-5"></i>
-    <span>&#1055;&#1086;&#1080;&#1089;&#1082;</span>
-  </button>
+  <button class="nav-btn active" data-tab="home"><i data-lucide="home" class="w-5 h-5"></i><span>&#1043;&#1083;&#1072;&#1074;&#1085;&#1072;&#1103;</span></button>
+  <button class="nav-btn" data-tab="search"><i data-lucide="search" class="w-5 h-5"></i><span>&#1055;&#1086;&#1080;&#1089;&#1082;</span></button>
   <button class="nav-btn" data-tab="profile" id="nav-profile-btn">
     <div class="nav-avatar-container">
       <img id="nav-avatar" src="" class="hidden w-6 h-6 rounded-full object-cover" />
