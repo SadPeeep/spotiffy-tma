@@ -2,7 +2,7 @@ import asyncio
 import base64
 import time
 from typing import Optional
-from urllib.parse import quote
+from urllib.parse import urlencode
 import httpx
 from .config import settings
 
@@ -32,23 +32,28 @@ class SpotifyClient:
         self._access_token = data["access_token"]
         self._token_expires_at = time.time() + data["expires_in"]
 
+    async def _search_one_type(self, q: str, type_: str, limit: int) -> dict:
+        """
+        Search Spotify for a SINGLE type (track, artist, or album).
+        Sends one type per request so commas never appear in the URL.
+        """
+        await self._ensure_token()
+        # urlencode only encodes q and limit; type_ is a plain word with no special chars
+        params = urlencode({"q": q, "type": type_, "limit": limit})
+        url = f"{self.BASE_URL}/search?{params}"
+        response = await self._client.get(
+            url,
+            headers={"Authorization": f"Bearer {self._access_token}"},
+        )
+        response.raise_for_status()
+        return response.json()
+
     async def _get(self, endpoint: str, params: dict = None) -> dict:
-        """Generic GET — params values are URL-encoded by httpx (safe for most fields)."""
         await self._ensure_token()
         response = await self._client.get(
             f"{self.BASE_URL}{endpoint}",
             headers={"Authorization": f"Bearer {self._access_token}"},
             params=params or {},
-        )
-        response.raise_for_status()
-        return response.json()
-
-    async def _get_raw_url(self, url: str) -> dict:
-        """GET with a pre-built URL — no extra encoding by httpx."""
-        await self._ensure_token()
-        response = await self._client.get(
-            url,
-            headers={"Authorization": f"Bearer {self._access_token}"},
         )
         response.raise_for_status()
         return response.json()
@@ -73,44 +78,51 @@ class SpotifyClient:
     async def search(
         self, query: str, search_type: str = "track,artist,album", limit: int = 20
     ) -> dict:
-        # Build URL manually so commas in 'type' are NOT percent-encoded.
-        # httpx encodes commas when using params={}, which Spotify rejects.
-        url = (
-            f"{self.BASE_URL}/search"
-            f"?q={quote(query)}"
-            f"&type={search_type}"
-            f"&limit={limit}"
-        )
-        data = await self._get_raw_url(url)
-        result = {}
-        if "tracks" in data:
-            result["tracks"] = [
-                self._format_track(t) for t in data["tracks"]["items"] if t
-            ]
-        if "artists" in data:
-            result["artists"] = [
-                {
-                    "id": a["id"],
-                    "name": a["name"],
-                    "genres": a.get("genres", []),
-                    "popularity": a.get("popularity", 0),
-                    "image_url": a["images"][0]["url"] if a.get("images") else None,
-                    "followers": a.get("followers", {}).get("total", 0),
-                }
-                for a in data["artists"]["items"]
-            ]
-        if "albums" in data:
-            result["albums"] = [
-                {
-                    "id": a["id"],
-                    "title": a["name"],
-                    "artist": ", ".join(ar["name"] for ar in a["artists"]),
-                    "cover_url": a["images"][0]["url"] if a.get("images") else None,
-                    "release_date": a.get("release_date"),
-                    "total_tracks": a.get("total_tracks", 0),
-                }
-                for a in data["albums"]["items"]
-            ]
+        """
+        Search Spotify. search_type may be a comma-separated list like
+        'track,artist,album'. We fire one request per type in parallel so
+        commas never appear in any URL (fixes Spotify 400 from %2C encoding).
+        """
+        types = [t.strip() for t in search_type.split(",") if t.strip()]
+
+        # Fire one request per type in parallel
+        tasks = [self._search_one_type(query, t, limit) for t in types]
+        raw_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        result: dict = {}
+        for t, raw in zip(types, raw_results):
+            if isinstance(raw, Exception):
+                continue  # skip failed types silently
+            if t == "track" and "tracks" in raw:
+                result["tracks"] = [
+                    self._format_track(item)
+                    for item in raw["tracks"]["items"]
+                    if item
+                ]
+            elif t == "artist" and "artists" in raw:
+                result["artists"] = [
+                    {
+                        "id": a["id"],
+                        "name": a["name"],
+                        "genres": a.get("genres", []),
+                        "popularity": a.get("popularity", 0),
+                        "image_url": a["images"][0]["url"] if a.get("images") else None,
+                        "followers": a.get("followers", {}).get("total", 0),
+                    }
+                    for a in raw["artists"]["items"]
+                ]
+            elif t == "album" and "albums" in raw:
+                result["albums"] = [
+                    {
+                        "id": a["id"],
+                        "title": a["name"],
+                        "artist": ", ".join(ar["name"] for ar in a["artists"]),
+                        "cover_url": a["images"][0]["url"] if a.get("images") else None,
+                        "release_date": a.get("release_date"),
+                        "total_tracks": a.get("total_tracks", 0),
+                    }
+                    for a in raw["albums"]["items"]
+                ]
         return result
 
     async def get_artist_details(self, artist_id: str) -> dict:
@@ -139,9 +151,7 @@ class SpotifyClient:
                 {
                     "id": a["id"],
                     "title": a["name"],
-                    "cover_url": (
-                        a["images"][0]["url"] if a.get("images") else None
-                    ),
+                    "cover_url": a["images"][0]["url"] if a.get("images") else None,
                     "release_date": a.get("release_date"),
                     "total_tracks": a.get("total_tracks", 0),
                 }
@@ -152,10 +162,6 @@ class SpotifyClient:
     async def get_recommendations(
         self, seed_tracks: list = None, seed_genres: list = None, limit: int = 20
     ) -> list:
-        """
-        /recommendations deprecated for new Spotify apps (Nov 2024).
-        Uses search-based approach instead.
-        """
         queries = []
         if seed_genres:
             for g in seed_genres[:2]:
@@ -163,12 +169,11 @@ class SpotifyClient:
         if not queries:
             queries = ["top hits 2025", "best songs 2025"]
 
-        all_tracks = []
+        all_tracks: list = []
         for q in queries:
             try:
                 data = await self.search(q, "track", limit)
-                tracks = data.get("tracks", [])
-                all_tracks.extend(tracks)
+                all_tracks.extend(data.get("tracks", []))
                 if len(all_tracks) >= limit:
                     break
             except Exception:
@@ -181,8 +186,8 @@ class SpotifyClient:
             except Exception:
                 pass
 
-        seen = set()
-        result = []
+        seen: set = set()
+        result: list = []
         for t in all_tracks:
             if t["id"] not in seen:
                 seen.add(t["id"])
@@ -207,33 +212,21 @@ class SpotifyClient:
         return tracks
 
     async def get_new_releases(self, limit: int = 20) -> list:
-        """
-        /browse/new-releases deprecated (Nov 2024).
-        Uses multiple search queries instead.
-        """
-        queries = ["new album 2025", "new music 2025", "latest album 2025"]
+        queries = ["new album 2025", "new music 2025", "latest releases 2025"]
         all_albums: list = []
         seen_ids: set = set()
 
         for q in queries:
             try:
-                url = (
-                    f"{self.BASE_URL}/search"
-                    f"?q={quote(q)}&type=album&limit={limit}"
-                )
-                data = await self._get_raw_url(url)
-                for a in data.get("albums", {}).get("items", []):
+                raw = await self._search_one_type(q, "album", limit)
+                for a in raw.get("albums", {}).get("items", []):
                     if a and a["id"] not in seen_ids:
                         seen_ids.add(a["id"])
                         all_albums.append({
                             "id": a["id"],
                             "title": a["name"],
-                            "artist": ", ".join(
-                                ar["name"] for ar in a["artists"]
-                            ),
-                            "cover_url": (
-                                a["images"][0]["url"] if a.get("images") else None
-                            ),
+                            "artist": ", ".join(ar["name"] for ar in a["artists"]),
+                            "cover_url": a["images"][0]["url"] if a.get("images") else None,
                             "release_date": a.get("release_date"),
                         })
                 if len(all_albums) >= limit:
@@ -241,37 +234,25 @@ class SpotifyClient:
             except Exception:
                 continue
 
-        all_albums.sort(
-            key=lambda x: x.get("release_date") or "", reverse=True
-        )
+        all_albums.sort(key=lambda x: x.get("release_date") or "", reverse=True)
         return all_albums[:limit]
 
     async def get_featured_playlists(self, limit: int = 10) -> list:
-        """
-        /browse/featured-playlists deprecated (Nov 2024).
-        Uses search for popular playlists.
-        """
         queries = ["top hits 2025", "best playlist 2025"]
         all_playlists: list = []
         seen_ids: set = set()
 
         for q in queries:
             try:
-                url = (
-                    f"{self.BASE_URL}/search"
-                    f"?q={quote(q)}&type=playlist&limit={limit}"
-                )
-                data = await self._get_raw_url(url)
-                for p in data.get("playlists", {}).get("items", []):
+                raw = await self._search_one_type(q, "playlist", limit)
+                for p in raw.get("playlists", {}).get("items", []):
                     if p and p["id"] not in seen_ids:
                         seen_ids.add(p["id"])
                         all_playlists.append({
                             "id": p["id"],
                             "title": p["name"],
                             "description": p.get("description", ""),
-                            "cover_url": (
-                                p["images"][0]["url"] if p.get("images") else None
-                            ),
+                            "cover_url": p["images"][0]["url"] if p.get("images") else None,
                             "tracks_total": p.get("tracks", {}).get("total", 0),
                         })
                 if len(all_playlists) >= limit:
