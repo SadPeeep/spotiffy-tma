@@ -51,4 +51,8 @@ export const api = {
   getPlaylist: (id) => apiRequest(`/api/playlists/${id}`),
 
   getArtist: (artistId) => apiRequest(`/api/artist/${encodeURIComponent(artistId)}`),
+
+  // Spotify OAuth / Web Playback SDK
+  getSpotifyLoginUrl: () => apiRequest('/api/spotify/login'),
+  getSpotifyToken:    () => apiRequest('/api/spotify/token'),
 };
