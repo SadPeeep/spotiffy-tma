@@ -32,16 +32,7 @@
   <!-- ===== HOME ===== -->
   <div id="tab-home" class="tab-content space-y-6">
 
-    <!-- Greeting -->
-    <div class="flex items-center gap-3 px-4 pt-5">
-      <img id="home-avatar" src="" class="w-10 h-10 rounded-full object-cover hidden" />
-      <div>
-        <p class="text-xs text-sp-muted">Привет,</p>
-        <p id="home-username" class="font-bold text-lg">...</p>
-      </div>
-    </div>
-
-    <!-- MY WAVE — animated blob section -->
+    <!-- MY WAVE — animated blob -->
     <div id="btn-my-wave" class="my-wave-section cursor-pointer">
       <div class="wave-blob wave-blob-yellow"></div>
       <div class="wave-blob wave-blob-purple"></div>
@@ -54,20 +45,20 @@
             <path d="M8 5v14l11-7z"/>
           </svg>
         </div>
-        <p class="wave-title">Моя Волна</p>
-        <p class="wave-sub">Персональные рекомендации</p>
+        <p class="wave-title">&#1052;&#1086;&#1103; &#1042;&#1086;&#1083;&#1085;&#1072;</p>
+        <p class="wave-sub">&#1055;&#1077;&#1088;&#1089;&#1086;&#1085;&#1072;&#1083;&#1100;&#1085;&#1099;&#1077; &#1088;&#1077;&#1082;&#1086;&#1084;&#1077;&#1085;&#1076;&#1072;&#1094;&#1080;&#1080;</p>
       </div>
     </div>
 
     <!-- New Releases -->
     <section class="px-4">
-      <h2 class="font-bold text-lg mb-3">Новинки</h2>
+      <h2 class="font-bold text-lg mb-3">&#1053;&#1086;&#1074;&#1080;&#1085;&#1082;&#1080;</h2>
       <div id="new-releases" class="flex gap-4 overflow-x-auto pb-2 scrollbar-none"></div>
     </section>
 
     <!-- Featured -->
     <section class="px-4 pb-6">
-      <h2 class="font-bold text-lg mb-3">Рекомендуемые</h2>
+      <h2 class="font-bold text-lg mb-3">&#1056;&#1077;&#1082;&#1086;&#1084;&#1077;&#1085;&#1076;&#1091;&#1077;&#1084;&#1099;&#1077;</h2>
       <div id="featured-playlists" class="grid grid-cols-2 gap-3"></div>
     </section>
   </div>
@@ -76,14 +67,14 @@
   <div id="tab-search" class="tab-content hidden p-4 space-y-4">
     <div class="relative pt-2">
       <i data-lucide="search" class="absolute left-3 top-1/2 mt-1 -translate-y-1/2 w-4 h-4 text-sp-muted"></i>
-      <input id="search-input" type="text" placeholder="Артисты, треки, альбомы..."
+      <input id="search-input" type="text" placeholder="&#1040;&#1088;&#1090;&#1080;&#1089;&#1090;&#1099;, &#1090;&#1088;&#1077;&#1082;&#1080;, &#1072;&#1083;&#1100;&#1073;&#1086;&#1084;&#1099;..."
         class="w-full bg-sp-surface pl-10 pr-4 py-3 rounded-xl text-sm outline-none focus:ring-1 focus:ring-sp-accent" />
     </div>
     <div class="flex gap-2 overflow-x-auto scrollbar-none">
-      <button class="filter-btn active" data-filter="track,artist,album">Все</button>
-      <button class="filter-btn" data-filter="track">Треки</button>
-      <button class="filter-btn" data-filter="artist">Артисты</button>
-      <button class="filter-btn" data-filter="album">Альбомы</button>
+      <button class="filter-btn active" data-filter="track,artist,album">&#1042;&#1089;&#1077;</button>
+      <button class="filter-btn" data-filter="track">&#1058;&#1088;&#1077;&#1082;&#1080;</button>
+      <button class="filter-btn" data-filter="artist">&#1040;&#1088;&#1090;&#1080;&#1089;&#1090;&#1099;</button>
+      <button class="filter-btn" data-filter="album">&#1040;&#1083;&#1100;&#1073;&#1086;&#1084;&#1099;</button>
     </div>
     <div id="genre-grid" class="grid grid-cols-2 gap-3"></div>
     <div id="search-results" class="space-y-1"></div>
@@ -107,7 +98,7 @@
     <div class="flex items-center justify-between bg-sp-surface rounded-xl px-4 py-3">
       <div class="flex items-center gap-3">
         <i data-lucide="wifi-off" class="w-5 h-5 text-sp-muted"></i>
-        <span class="text-sm font-medium">Оффлайн-режим</span>
+        <span class="text-sm font-medium">&#1054;&#1092;&#1092;&#1083;&#1072;&#1081;&#1085;-&#1088;&#1077;&#1078;&#1080;&#1084;</span>
       </div>
       <label class="relative inline-flex items-center cursor-pointer">
         <input type="checkbox" id="offline-toggle" class="sr-only peer" />
@@ -117,17 +108,17 @@
     </div>
 
     <div class="flex gap-2">
-      <button class="profile-tab active" data-ptab="favorites">Избранное</button>
-      <button class="profile-tab" data-ptab="playlists">Плейлисты</button>
+      <button class="profile-tab active" data-ptab="favorites">&#1048;&#1079;&#1073;&#1088;&#1072;&#1085;&#1085;&#1086;&#1077;</button>
+      <button class="profile-tab" data-ptab="playlists">&#1055;&#1083;&#1077;&#1081;&#1083;&#1080;&#1089;&#1090;&#1099;</button>
     </div>
 
     <div id="profile-favorites" class="profile-tab-content space-y-1">
-      <p class="text-sp-muted text-sm text-center py-8">Загрузка...</p>
+      <p class="text-sp-muted text-sm text-center py-8">&#1047;&#1072;&#1075;&#1088;&#1091;&#1079;&#1082;&#1072;...</p>
     </div>
 
     <div id="profile-playlists" class="profile-tab-content hidden">
       <button id="btn-import-playlist" class="w-full flex items-center justify-center gap-2 border border-sp-accent text-sp-accent rounded-xl py-3 text-sm font-medium mb-4">
-        <i data-lucide="plus-circle" class="w-4 h-4"></i> Импортировать плейлист Spotify
+        <i data-lucide="plus-circle" class="w-4 h-4"></i> &#1048;&#1084;&#1087;&#1086;&#1088;&#1090;&#1080;&#1088;&#1086;&#1074;&#1072;&#1090;&#1100; &#1087;&#1083;&#1077;&#1081;&#1083;&#1080;&#1089;&#1090; Spotify
       </button>
       <div id="playlists-list" class="space-y-1"></div>
     </div>
@@ -156,13 +147,20 @@
 <!-- ===== BOTTOM NAV ===== -->
 <nav class="fixed bottom-0 left-0 right-0 bg-sp-surface border-t border-white/10 flex z-50">
   <button class="nav-btn active" data-tab="home">
-    <i data-lucide="home" class="w-5 h-5"></i><span>Главная</span>
+    <i data-lucide="home" class="w-5 h-5"></i>
+    <span>&#1043;&#1083;&#1072;&#1074;&#1085;&#1072;&#1103;</span>
   </button>
   <button class="nav-btn" data-tab="search">
-    <i data-lucide="search" class="w-5 h-5"></i><span>Поиск</span>
+    <i data-lucide="search" class="w-5 h-5"></i>
+    <span>&#1055;&#1086;&#1080;&#1089;&#1082;</span>
   </button>
-  <button class="nav-btn" data-tab="profile">
-    <i data-lucide="user" class="w-5 h-5"></i><span>Профиль</span>
+  <!-- Profile nav: shows avatar when loaded, user icon as fallback -->
+  <button class="nav-btn" data-tab="profile" id="nav-profile-btn">
+    <div class="nav-avatar-container">
+      <img id="nav-avatar" src="" class="hidden w-6 h-6 rounded-full object-cover" />
+      <i data-lucide="user" id="nav-profile-icon" class="w-5 h-5"></i>
+    </div>
+    <span>&#1055;&#1088;&#1086;&#1092;&#1080;&#1083;&#1100;</span>
   </button>
 </nav>
 
@@ -172,7 +170,7 @@
   <div class="relative z-10 flex flex-col h-full">
     <div class="flex items-center justify-between px-5 pt-5 pb-2">
       <button id="player-close" class="p-2"><i data-lucide="chevron-down" class="w-6 h-6"></i></button>
-      <p class="text-sm font-semibold text-sp-muted uppercase tracking-widest">Сейчас играет</p>
+      <p class="text-sm font-semibold text-sp-muted uppercase tracking-widest">&#1057;&#1077;&#1081;&#1095;&#1072;&#1089; &#1080;&#1075;&#1088;&#1072;&#1077;&#1090;</p>
       <button id="player-share" class="p-2"><i data-lucide="share-2" class="w-5 h-5"></i></button>
     </div>
     <div class="flip-container flex-1 mx-5">
@@ -182,7 +180,7 @@
         </div>
         <div class="flip-back">
           <div id="lyrics-loading" class="flex justify-center py-8"><div class="loading-spinner"></div></div>
-          <div id="lyrics-empty" class="hidden text-center text-sp-muted py-8">Текст не найден</div>
+          <div id="lyrics-empty" class="hidden text-center text-sp-muted py-8">&#1058;&#1077;&#1082;&#1089;&#1090; &#1085;&#1077; &#1085;&#1072;&#1081;&#1076;&#1077;&#1085;</div>
           <div id="lyrics-container" class="space-y-1"></div>
         </div>
       </div>
@@ -234,14 +232,14 @@
       <p id="artist-modal-followers" class="text-sp-muted text-sm"></p>
     </div>
     <button id="artist-shuffle-all" class="flex items-center gap-2 bg-sp-accent text-black font-bold px-6 py-3 rounded-full text-sm">
-      <i data-lucide="shuffle" class="w-4 h-4"></i> Перемешать все
+      <i data-lucide="shuffle" class="w-4 h-4"></i> &#1055;&#1077;&#1088;&#1077;&#1084;&#1077;&#1096;&#1072;&#1090;&#1100; &#1074;&#1089;&#1077;
     </button>
     <div>
-      <h3 class="font-bold text-lg mb-2">Популярные треки</h3>
+      <h3 class="font-bold text-lg mb-2">&#1055;&#1086;&#1087;&#1091;&#1083;&#1103;&#1088;&#1085;&#1099;&#1077; &#1090;&#1088;&#1077;&#1082;&#1080;</h3>
       <div id="artist-modal-tracks" class="space-y-1"></div>
     </div>
     <div>
-      <h3 class="font-bold text-lg mb-2">Альбомы</h3>
+      <h3 class="font-bold text-lg mb-2">&#1040;&#1083;&#1100;&#1073;&#1086;&#1084;&#1099;</h3>
       <div id="artist-modal-albums" class="grid grid-cols-2 gap-3"></div>
     </div>
   </div>
@@ -250,12 +248,12 @@
 <!-- ===== IMPORT MODAL ===== -->
 <div id="import-modal" class="hidden fixed inset-0 z-[60] bg-black/70 flex items-end">
   <div class="bg-sp-surface w-full rounded-t-2xl p-5 space-y-4">
-    <h3 class="font-bold text-lg">Импорт плейлиста</h3>
+    <h3 class="font-bold text-lg">&#1048;&#1084;&#1087;&#1086;&#1088;&#1090; &#1087;&#1083;&#1077;&#1081;&#1083;&#1080;&#1089;&#1090;&#1072;</h3>
     <input id="import-url-input" type="url" placeholder="https://open.spotify.com/playlist/..."
       class="w-full bg-sp-bg border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-sp-accent" />
     <div class="flex gap-3">
-      <button id="import-cancel" class="flex-1 py-3 rounded-xl border border-white/20 text-sm">Отмена</button>
-      <button id="import-confirm" class="flex-1 py-3 rounded-xl bg-sp-accent text-black font-bold text-sm">Импортировать</button>
+      <button id="import-cancel" class="flex-1 py-3 rounded-xl border border-white/20 text-sm">&#1054;&#1090;&#1084;&#1077;&#1085;&#1072;</button>
+      <button id="import-confirm" class="flex-1 py-3 rounded-xl bg-sp-accent text-black font-bold text-sm">&#1048;&#1084;&#1087;&#1086;&#1088;&#1090;&#1080;&#1088;&#1086;&#1074;&#1072;&#1090;&#1100;</button>
     </div>
   </div>
 </div>
