@@ -7,3 +7,4 @@ yt-dlp==2024.5.27
 python-jose[cryptography]==3.3.0
 python-multipart==0.0.9
 pydantic-settings==2.3.0
+aiofiles==23.2.1
