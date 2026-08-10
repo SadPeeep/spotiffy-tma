@@ -104,8 +104,7 @@ window.openAlbumSearch = async (artist) => {
 window.openSpotifyPlaylist = async (playlistId) => {
   try {
     showToast('\u0417\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u043c...');
-    // FIX: was `https://...` — invalid URL with extra braces
-    const url = `https://open.spotify.com/playlist/${playlistId}`;
+    const url = 'https://open.spotify.com/playlist/' + playlistId;
     const data = await api.importPlaylist(url);
     if (data.tracks?.length) { player.loadQueue(data.tracks); player.playTrack(0); }
   } catch { showToast('\u041e\u0448\u0438\u0431\u043a\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0438'); }
