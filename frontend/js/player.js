@@ -14,8 +14,8 @@ let _sdkFailed = false;
  */
 export function initSpotifySDK(token) {
   _accessToken = token;
+  _sdkFailed = false; // сброс — позволяет переподключиться
   return new Promise((resolve) => {
-    // Timeout after 10s — SDK might not work in Telegram WebView
     const timeout = setTimeout(() => {
       if (!_sdkReady) {
         console.warn('Spotify SDK timed out — will use preview_url fallback');
@@ -68,11 +68,6 @@ export function initSpotifySDK(token) {
           resolve(false);
         });
 
-        _sdkPlayer.addListener('player_state_changed', (state) => {
-          if (!state) return;
-          // state updates handled by polling in _startSDKProgress
-        });
-
         _sdkPlayer.connect().then(success => {
           if (!success) {
             clearTimeout(timeout);
@@ -106,10 +101,11 @@ export function updateSpotifyToken(token) {
 }
 
 export function isSDKReady() {
-  return !!(  _deviceId && _accessToken && _sdkReady);
+  return !!(_deviceId && _accessToken && _sdkReady);
 }
 
-async function _playViaSDK(trackId, onPlayPause) {
+// FIX: убрали onPlayPause из параметров — не зовём его оптимистично
+async function _playViaSDK(trackId) {
   if (!_deviceId || !_accessToken) return false;
   try {
     const url = 'https://api.spotify.com/v1/me/player/play?device_id=' + encodeURIComponent(_deviceId);
@@ -122,8 +118,13 @@ async function _playViaSDK(trackId, onPlayPause) {
       body: JSON.stringify({ uris: ['spotify:track:' + trackId] }),
     });
     if (resp.status === 204 || resp.ok) {
-      onPlayPause(true);
       return true;
+    }
+    // FIX: если девайс пропал — сбрасываем state чтобы следующий вызов сразу упал на fallback
+    if (resp.status === 404) {
+      console.warn('SDK device not found, resetting deviceId');
+      _deviceId = null;
+      _sdkReady = false;
     }
     const errBody = await resp.json().catch(() => ({}));
     console.error('SDK play error:', resp.status, errBody);
@@ -136,7 +137,7 @@ async function _playViaSDK(trackId, onPlayPause) {
 
 export class Player {
   constructor({ onTrackChange, onPlayPause, onProgress }) {
-    this.audio = new Audio(); // fallback: preview_url / offline
+    this.audio = new Audio();
     this.queue = [];
     this.currentIndex = -1;
     this.currentTrack = null;
@@ -147,6 +148,8 @@ export class Player {
     this._onPlayPause = onPlayPause;
     this._onProgress = onProgress;
     this._usingSDK = false;
+    this._playId = 0; // FIX: счётчик для отмены устаревших async вызовов
+    this._stateChangedHandler = null;
 
     this.audio.addEventListener('timeupdate', () => {
       if (this._usingSDK) return;
@@ -165,6 +168,10 @@ export class Player {
 
   async playTrack(index) {
     if (index < 0 || index >= this.queue.length) return;
+
+    // FIX 1: уникальный ID этого вызова — если появится новый, этот отменяется
+    const playId = ++this._playId;
+
     this.currentIndex = index;
     const track = this.queue[index];
     this.currentTrack = track;
@@ -178,6 +185,7 @@ export class Player {
     try {
       // 1. Offline cache
       const offline = await getOfflineTrack(track.id);
+      if (playId !== this._playId) return; // устарело — другой трек уже запущен
       if (offline?.audio) {
         this.audio.src = URL.createObjectURL(offline.audio);
         await this.audio.play();
@@ -185,9 +193,10 @@ export class Player {
         return;
       }
 
-      // 2. Spotify Web Playback SDK (full track, requires Premium)
+      // 2. Spotify Web Playback SDK (полный трек, требует Premium)
       if (!_sdkFailed && _sdkReady && _deviceId && _accessToken && track.id) {
-        const ok = await _playViaSDK(track.id, this._onPlayPause.bind(this));
+        const ok = await _playViaSDK(track.id); // FIX: без onPlayPause
+        if (playId !== this._playId) return; // устарело
         if (ok) {
           this._usingSDK = true;
           this._startSDKProgress();
@@ -196,31 +205,46 @@ export class Player {
         }
       }
 
-      // 3. 30-sec preview fallback
+      // 3. 30-сек превью fallback
       if (track.preview_url) {
         this.audio.src = track.preview_url;
+        if (playId !== this._playId) return; // устарело
         try {
           await this.audio.play();
           window.showToast?.('\u26a1 30\u0441 \u043f\u0440\u0435\u0432\u044c\u044e');
         } catch (e) {
-          // Autoplay blocked — user interaction needed
           window.showToast?.('\u041d\u0430\u0436\u043c\u0438 \u25B6 \u0434\u043b\u044f \u0432\u043e\u0441\u043f\u0440\u043e\u0438\u0437\u0432\u0435\u0434\u0435\u043d\u0438\u044f');
         }
         this.isLoading = false;
         return;
       }
 
-      window.showToast?.('\u041d\u0435\u0442 \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e\u0433\u043e \u0430\u0443\u0434\u0438\u043e. \u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0438\u0442\u0435 Spotify Premium.');
+      window.showToast?.('\u041d\u0435\u0442 \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e\u0433\u043e \u0430\u0443\u0434\u0438\u043e.');
     } catch (e) {
+      if (playId !== this._playId) return;
       console.error('playTrack error:', e);
       window.showToast?.('\u041e\u0448\u0438\u0431\u043a\u0430: ' + (e?.message || ''));
     } finally {
-      this.isLoading = false;
+      if (playId === this._playId) this.isLoading = false;
     }
   }
 
   _startSDKProgress() {
     this._stopSDKProgress();
+
+    // FIX 2: слушаем player_state_changed для надёжного определения конца трека
+    if (_sdkPlayer) {
+      this._stateChangedHandler = (state) => {
+        if (!state || !this._usingSDK) return;
+        // Трек закончился: встал на паузу, позиция 0, есть предыдущий трек
+        if (state.paused && state.position === 0 && state.track_window?.previous_tracks?.length > 0) {
+          this._stopSDKProgress();
+          this._onEnd();
+        }
+      };
+      _sdkPlayer.addListener('player_state_changed', this._stateChangedHandler);
+    }
+
     _progressInterval = setInterval(async () => {
       if (!_sdkPlayer) return;
       try {
@@ -230,8 +254,10 @@ export class Player {
         const dur = state.duration / 1000;
         this._onProgress(pos, dur);
         if (window.syncLyricsGlobal) window.syncLyricsGlobal(pos);
+        // FIX: onPlayPause теперь здесь — реальное состояние, не оптимистичное
         this._onPlayPause(!state.paused);
-        if (!state.paused && dur > 0 && state.position >= state.duration - 500) {
+        // FIX 3: расширяем окно до 1500мс чтобы не пропустить конец между polls
+        if (!state.paused && dur > 0 && state.position >= state.duration - 1500) {
           this._stopSDKProgress();
           this._onEnd();
         }
@@ -243,6 +269,10 @@ export class Player {
 
   _stopSDKProgress() {
     if (_progressInterval) { clearInterval(_progressInterval); _progressInterval = null; }
+    if (_sdkPlayer && this._stateChangedHandler) {
+      _sdkPlayer.removeListener('player_state_changed', this._stateChangedHandler);
+      this._stateChangedHandler = null;
+    }
   }
 
   togglePlay() {
