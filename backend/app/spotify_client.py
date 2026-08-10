@@ -5,6 +5,8 @@ from typing import Optional
 import httpx
 from .config import settings
 
+DEFAULT_GENRES = ["pop", "hip-hop", "electronic"]
+
 
 class SpotifyClient:
     BASE_URL = "https://api.spotify.com/v1"
@@ -118,15 +120,25 @@ class SpotifyClient:
     async def get_recommendations(
         self, seed_tracks: list = None, seed_genres: list = None, limit: int = 20
     ) -> list:
-        params = {"limit": limit}
-        if seed_tracks:
-            params["seed_tracks"] = ",".join(seed_tracks[:5])
+        """
+        /recommendations is deprecated for new Spotify apps (Nov 2024).
+        Replaced with search-based approach.
+        """
         if seed_genres:
-            params["seed_genres"] = ",".join(seed_genres[:5])
-        if not params.get("seed_tracks") and not params.get("seed_genres"):
-            params["seed_genres"] = "pop,hip-hop,rock"
-        data = await self._get("/recommendations", params)
-        return [self._format_track(t) for t in data.get("tracks", [])]
+            genre = seed_genres[0]
+            q = f"genre:{genre}"
+        else:
+            q = "year:2024-2025 tag:hipster"
+        try:
+            data = await self._get("/search", {"q": q, "type": "track", "limit": limit})
+            tracks = [self._format_track(t) for t in data.get("tracks", {}).get("items", []) if t]
+            if tracks:
+                return tracks
+        except Exception:
+            pass
+        # Fallback: popular tracks
+        data = await self._get("/search", {"q": "top hits 2025", "type": "track", "limit": limit})
+        return [self._format_track(t) for t in data.get("tracks", {}).get("items", []) if t]
 
     async def parse_playlist(self, playlist_id: str) -> list:
         tracks = []
@@ -158,7 +170,15 @@ class SpotifyClient:
         ]
 
     async def get_featured_playlists(self, limit: int = 10) -> list:
-        data = await self._get("/browse/featured-playlists", {"limit": limit})
+        """
+        /browse/featured-playlists is deprecated for new Spotify apps (Nov 2024).
+        Replaced with search for popular playlists.
+        """
+        data = await self._get("/search", {
+            "q": "top hits 2025",
+            "type": "playlist",
+            "limit": limit,
+        })
         return [
             {
                 "id": p["id"],
@@ -167,7 +187,7 @@ class SpotifyClient:
                 "cover_url": p["images"][0]["url"] if p.get("images") else None,
                 "tracks_total": p.get("tracks", {}).get("total", 0),
             }
-            for p in data.get("playlists", {}).get("items", [])
+            for p in data.get("playlists", {}).get("items", []) if p
         ]
 
 
