@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, JSON
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, String, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
 from .database import Base
@@ -19,6 +19,20 @@ class User(Base):
     favorites: Mapped[list["Favorite"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     playlists: Mapped[list["Playlist"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     history: Mapped[list["History"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+
+class SpotifyToken(Base):
+    """Stores Spotify OAuth tokens per Telegram user."""
+    __tablename__ = "spotify_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False, index=True)
+    access_token: Mapped[str] = mapped_column(String(2048), nullable=False)
+    refresh_token: Mapped[str] = mapped_column(String(2048), nullable=False)
+    expires_at: Mapped[float] = mapped_column(Float, nullable=False)  # Unix timestamp
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
 
 class Favorite(Base):
