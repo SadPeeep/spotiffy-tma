@@ -136,7 +136,6 @@ class SpotifyClient:
                 return tracks
         except Exception:
             pass
-        # Fallback: popular tracks
         data = await self._get("/search", {"q": "top hits 2025", "type": "track", "limit": limit})
         return [self._format_track(t) for t in data.get("tracks", {}).get("items", []) if t]
 
@@ -157,17 +156,43 @@ class SpotifyClient:
         return tracks
 
     async def get_new_releases(self, limit: int = 20) -> list:
-        data = await self._get("/browse/new-releases", {"limit": limit})
-        return [
-            {
-                "id": a["id"],
-                "title": a["name"],
-                "artist": ", ".join(ar["name"] for ar in a["artists"]),
-                "cover_url": a["images"][0]["url"] if a.get("images") else None,
-                "release_date": a.get("release_date"),
-            }
-            for a in data.get("albums", {}).get("items", [])
-        ]
+        """
+        /browse/new-releases is deprecated for new Spotify apps (Nov 2024).
+        Replaced with search for recent albums.
+        """
+        try:
+            data = await self._get("/search", {
+                "q": "year:2025",
+                "type": "album",
+                "limit": limit,
+            })
+            return [
+                {
+                    "id": a["id"],
+                    "title": a["name"],
+                    "artist": ", ".join(ar["name"] for ar in a["artists"]),
+                    "cover_url": a["images"][0]["url"] if a.get("images") else None,
+                    "release_date": a.get("release_date"),
+                }
+                for a in data.get("albums", {}).get("items", []) if a
+            ]
+        except Exception:
+            # Fallback: popular albums
+            data = await self._get("/search", {
+                "q": "top albums 2025",
+                "type": "album",
+                "limit": limit,
+            })
+            return [
+                {
+                    "id": a["id"],
+                    "title": a["name"],
+                    "artist": ", ".join(ar["name"] for ar in a["artists"]),
+                    "cover_url": a["images"][0]["url"] if a.get("images") else None,
+                    "release_date": a.get("release_date"),
+                }
+                for a in data.get("albums", {}).get("items", []) if a
+            ]
 
     async def get_featured_playlists(self, limit: int = 10) -> list:
         """
